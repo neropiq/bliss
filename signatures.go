@@ -223,7 +223,10 @@ func (pk *PrivateKeyT) Sign(msg []byte) *SignatureT {
 }
 
 func (pk *PrivateKeyT) sign(msg []byte, entropy *entropyT) *SignatureT {
-	p := newBlissParams(pk.kind)
+	p, err := GetParam(pk.kind)
+	if err != nil {
+		panic(err)
+	}
 	n := p.n
 
 	//opaque, but clearly a pointer type.
@@ -392,7 +395,10 @@ func (pub *PublicKeyT) Verify(signature *SignatureT, msg []byte) error {
 	if pub.kind != signature.kind {
 		return errors.New("different kind")
 	}
-	p := newBlissParams(pub.kind)
+	p, err := GetParam(pub.kind)
+	if err != nil {
+		panic(err)
+	}
 
 	n := p.n
 

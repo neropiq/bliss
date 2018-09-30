@@ -23,7 +23,9 @@
 
 package bliss
 
-import "golang.org/x/crypto/blake2b"
+import (
+	"golang.org/x/crypto/blake2b"
+)
 
 /*PrivateKeyT is a bliss-b private key
  *
@@ -84,7 +86,10 @@ func NewPrivateKey(kind Kind, seed [64]byte) *PrivateKeyT {
 }
 
 func newPrivateKey(kind Kind, entropy *entropyT) *PrivateKeyT {
-	p := newBlissParams(kind)
+	p, err := GetParam(kind)
+	if err != nil {
+		panic(err)
+	}
 	/* we calloc so we do not have to zero them out later */
 	pk := &PrivateKeyT{
 		kind: kind,
@@ -92,7 +97,6 @@ func newPrivateKey(kind Kind, entropy *entropyT) *PrivateKeyT {
 	//opaque, but clearly a pointer type.
 	state := newNtt(kind)
 	var u []int32
-	var err error
 
 	/* randomize g */
 	pk.s2 = uniformPoly(p.n, p.nz1, p.nz2, entropy)

@@ -23,6 +23,8 @@
 
 package bliss
 
+import "errors"
+
 /*Kind is  Names for the five varieties of bliss-b */
 type Kind byte
 
@@ -35,10 +37,13 @@ const (
 	B4
 )
 
-type blissParamT struct {
-	kind  Kind   /* the kind of bliss-b (i.e. *this* choice of parameters)  */
-	q     int32  /* field modulus  */
-	n     int    /* ring size (x^n+1)  */
+//ParamT is a param for each BlissB0~B4
+type ParamT struct {
+	kind  Kind  /* the kind of bliss-b (i.e. *this* choice of parameters)  */
+	q     int32 /* field modulus  */
+	qBits uint
+	n     int /* ring size (x^n+1)  */
+	nBits uint
 	d     uint32 /* bit drop shift  */
 	modP  int32  /* magic modulus  (derived from d) */
 	q2    int32  /* 2 * field modulus  */
@@ -47,8 +52,9 @@ type blissParamT struct {
 	oneQ2 int32  /* 1/(q+2) mod 2q     */
 	kappa uint32 /* index vector size  */
 
-	bInf uint32 /* infinite norm  */
-	bL2  uint32 /* L2 norm  */
+	bInf  uint32 /* infinite norm  */
+	bBits uint
+	bL2   uint32 /* L2 norm  */
 
 	nz1 uint32 /* nonzero +-1  aka delta_1*n in L Ducas' Bliss-B paper */
 	nz2 uint32 /* nonzero +-2  aka delta_2*n  in L Ducas' Bliss-B paper */
@@ -364,21 +370,24 @@ var r12289n512 = []int32{
 	5618, 7735, 4094, 540, 8452, 4939, 5118, 5826,
 }
 
-var blissBParams = []*blissParamT{
+var blissBParams = []*ParamT{
 
 	/* bliss-b 0 */
-	&blissParamT{
-		kind:      B0,          /* kind */
-		q:         7681,        /* q */
-		n:         256,         /* n */
-		d:         5,           /* d */
-		modP:      480,         /* mod_p */
-		q2:        15362,       /* 2 * field modulus  */
-		qInv:      559167,      /* floor(2^32/q)      */
-		q2Inv:     279583,      /* floor(2^32/q2)     */
-		oneQ2:     3841,        /* 1/(q + 2) mod 2q   */
-		kappa:     12,          /* kappa */
-		bInf:      530,         /* b_inf */
+	&ParamT{
+		kind:      B0,   /* kind */
+		q:         7681, /* q */
+		qBits:     13,
+		n:         256, /* n */
+		nBits:     8,
+		d:         5,      /* d */
+		modP:      480,    /* mod_p */
+		q2:        15362,  /* 2 * field modulus  */
+		qInv:      559167, /* floor(2^32/q)      */
+		q2Inv:     279583, /* floor(2^32/q2)     */
+		oneQ2:     3841,   /* 1/(q + 2) mod 2q   */
+		kappa:     12,     /* kappa */
+		bInf:      530,    /* b_inf */
+		bBits:     10 + 1,
 		bL2:       2492 * 2492, /* L2 norm */
 		nz1:       141,         /* nz1 */
 		nz2:       39,          /* nz2 */
@@ -392,18 +401,21 @@ var blissBParams = []*blissParamT{
 	},
 
 	/* bliss-b 1 */
-	&blissParamT{
-		kind:      B1,            /* kind */
-		q:         12289,         /* q */
-		n:         512,           /* n */
-		d:         10,            /* d */
-		modP:      24,            /* mod_p */
-		q2:        24578,         /* q2 = 2 * field modulus  */
-		qInv:      349496,        /* q_inv = floor(2^32/q) */
-		q2Inv:     174748,        /* q2_inv = floor(2^32/q2) */
-		oneQ2:     6145,          /* one_q2 = 1/(q + 2) mod 2q */
-		kappa:     23,            /* kappa */
-		bInf:      2100,          /* b_inf */
+	&ParamT{
+		kind:      B1,    /* kind */
+		q:         12289, /* q */
+		qBits:     14,
+		n:         512, /* n */
+		nBits:     9,
+		d:         10,     /* d */
+		modP:      24,     /* mod_p */
+		q2:        24578,  /* q2 = 2 * field modulus  */
+		qInv:      349496, /* q_inv = floor(2^32/q) */
+		q2Inv:     174748, /* q2_inv = floor(2^32/q2) */
+		oneQ2:     6145,   /* one_q2 = 1/(q + 2) mod 2q */
+		kappa:     23,     /* kappa */
+		bInf:      2100,   /* b_inf */
+		bBits:     12 + 1,
 		bL2:       12872 * 12872, /* b_l2 = square of L2 norm */
 		nz1:       154,           /* nz1 = number of coeffs equal to +/-1 in the private key */
 		nz2:       0,             /* nz2 = number of coeffs equal to +/-2 */
@@ -418,18 +430,21 @@ var blissBParams = []*blissParamT{
 
 	/* bliss-b 2 */
 
-	&blissParamT{
-		kind:      B2,            /* kind */
-		q:         12289,         /* q */
-		n:         512,           /* n */
-		d:         10,            /* d */
-		modP:      24,            /* mod_p */
-		q2:        24578,         /* 2 * field modulus  */
-		qInv:      349496,        /* floor(2^32/q)      */
-		q2Inv:     174748,        /* floor(2^32/q2)     */
-		oneQ2:     6145,          /* 1/(q + 2) mod 2q   */
-		kappa:     23,            /* kappa */
-		bInf:      1563,          /* b_inf */
+	&ParamT{
+		kind:      B2,    /* kind */
+		q:         12289, /* q */
+		qBits:     14,
+		n:         512, /* n */
+		nBits:     9,
+		d:         10,     /* d */
+		modP:      24,     /* mod_p */
+		q2:        24578,  /* 2 * field modulus  */
+		qInv:      349496, /* floor(2^32/q)      */
+		q2Inv:     174748, /* floor(2^32/q2)     */
+		oneQ2:     6145,   /* 1/(q + 2) mod 2q   */
+		kappa:     23,     /* kappa */
+		bInf:      1563,   /* b_inf */
+		bBits:     11 + 1,
 		bL2:       11074 * 11074, /* L2 norm */
 		nz1:       154,           /* nz1 */
 		nz2:       0,             /* nz2 */
@@ -444,18 +459,21 @@ var blissBParams = []*blissParamT{
 
 	/* bliss-b 3 */
 
-	&blissParamT{
-		kind:      B3,            /* kind */
-		q:         12289,         /* q */
-		n:         512,           /* n */
-		d:         9,             /* d */
-		modP:      48,            /* mod_p */
-		q2:        24578,         /* 2 * field modulus  */
-		qInv:      349496,        /* floor(2^32/q)      */
-		q2Inv:     174748,        /* floor(2^32/q2)     */
-		oneQ2:     6145,          /* 1/(q + 2) mod 2q   */
-		kappa:     30,            /* kappa */
-		bInf:      1760,          /* b_inf */
+	&ParamT{
+		kind:      B3,    /* kind */
+		q:         12289, /* q */
+		qBits:     14,
+		n:         512, /* n */
+		nBits:     9,
+		d:         9,      /* d */
+		modP:      48,     /* mod_p */
+		q2:        24578,  /* 2 * field modulus  */
+		qInv:      349496, /* floor(2^32/q)      */
+		q2Inv:     174748, /* floor(2^32/q2)     */
+		oneQ2:     6145,   /* 1/(q + 2) mod 2q   */
+		kappa:     30,     /* kappa */
+		bInf:      1760,   /* b_inf */
+		bBits:     11 + 1,
 		bL2:       10206 * 10206, /* L2 norm */
 		nz1:       216,           /* nz1 */
 		nz2:       16,            /* nz2 */
@@ -470,18 +488,21 @@ var blissBParams = []*blissParamT{
 
 	/* bliss-b 4 */
 
-	&blissParamT{
-		kind:      B4,          /* kind */
-		q:         12289,       /* q */
-		n:         512,         /* n */
-		d:         8,           /* d */
-		modP:      96,          /* mod_p */
-		q2:        24578,       /* 2 * field modulus  */
-		qInv:      349496,      /* floor(2^32/q)      */
-		q2Inv:     174748,      /* floor(2^32/q2)     */
-		oneQ2:     6145,        /* 1/(q + 2) mod 2q   */
-		kappa:     39,          /* kappa */
-		bInf:      1613,        /* b_inf */
+	&ParamT{
+		kind:      B4,    /* kind */
+		q:         12289, /* q */
+		qBits:     14,
+		n:         512,    /* n */
+		nBits:     9,      /* n */
+		d:         8,      /* d */
+		modP:      96,     /* mod_p */
+		q2:        24578,  /* 2 * field modulus  */
+		qInv:      349496, /* floor(2^32/q)      */
+		q2Inv:     174748, /* floor(2^32/q2)     */
+		oneQ2:     6145,   /* 1/(q + 2) mod 2q   */
+		kappa:     39,     /* kappa */
+		bInf:      1613,   /* b_inf */
+		bBits:     11 + 1,
 		bL2:       9901 * 9901, /* L2 norm */
 		nz1:       231,         /* nz1 */
 		nz2:       31,          /* nz2 */
@@ -495,9 +516,28 @@ var blissBParams = []*blissParamT{
 	},
 }
 
-func newBlissParams(kind Kind) *blissParamT {
+//GetParam get a param of kind.
+func GetParam(kind Kind) (*ParamT, error) {
 	if B0 <= kind && kind <= B4 {
-		return blissBParams[kind]
+		return blissBParams[kind], nil
 	}
-	panic("invalid bliss kind")
+	return nil, errors.New("invalid bliss kind")
+}
+
+//PKSize returns the size of publickey.
+func (p *ParamT) PKSize() int {
+	return int(p.qBits)*p.n/8 + 1
+}
+
+//SigSize returns the size of signature..
+func (p *ParamT) SigSize() int {
+	nbits := (int(p.bBits)*p.n + int(p.z2bits())*p.n + int(p.kappa)*int(p.nBits)) + 3
+	//z1+z2+c+kind
+	if nbits&0x7 == 0 {
+		return nbits/8 + 1
+	}
+	return nbits/8 + 1 + 1
+}
+func (p *ParamT) z2bits() uint {
+	return uint(p.bBits) - uint(p.d)
 }

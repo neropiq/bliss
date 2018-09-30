@@ -37,7 +37,10 @@ type nttStateT struct {
 }
 
 func newNtt(kind Kind) *nttStateT {
-	param := newBlissParams(kind)
+	param, err := GetParam(kind)
+	if err != nil {
+		panic(err)
+	}
 	return &nttStateT{
 		q: param.q,
 		w: param.w,
