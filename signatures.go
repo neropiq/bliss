@@ -24,9 +24,12 @@
 package bliss
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
+
+	"golang.org/x/crypto/blake2b"
 
 	"golang.org/x/crypto/sha3"
 )
@@ -42,20 +45,20 @@ type SignatureT struct {
 const verboseRestart = false
 
 /* iam: bliss-06-13-2013 */
-func mul2d(input []int32, n, d uint32) []int32 {
+func mul2d(input []int32, n int, d uint32) []int32 {
 	if 0 >= d || d >= 31 {
 		panic("invalid d")
 	}
 
 	output := make([]int32, n)
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		output[i] = input[i] << d
 	}
 	return output
 }
 
-func checkarg(v []int32, n uint32, q int32) bool {
-	for i := uint32(0); i < n; i++ {
+func checkarg(v []int32, q int32) bool {
+	for i := range v {
 		if v[i] < 0 {
 			return false
 		}
@@ -75,7 +78,7 @@ func checkarg(v []int32, n uint32, q int32) bool {
  *   this is computing: x -. [x]_d
  *
  */
-func dropBits(input []int32, n, d uint32) []int32 {
+func dropBits(input []int32, n int, d uint32) []int32 {
 	if 0 >= d || d >= 31 {
 		panic("invalid d")
 	}
@@ -83,7 +86,7 @@ func dropBits(input []int32, n, d uint32) []int32 {
 	delta := int32(1) << d
 	halfdelta := delta >> 1
 	output := make([]int32, n)
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		output[i] = (input[i] + halfdelta) / delta
 	}
 	return output
@@ -100,15 +103,15 @@ func dropBits(input []int32, n, d uint32) []int32 {
  * Output: v1 and v2 are output polynomials of size n.
  *
  */
-func greedySC(s1 []int32, s2 []int32, n uint32, cIndices []uint32, kappa uint32) ([]int32, []int32) {
+func greedySC(s1 []int32, s2 []int32, n int, cIndices []uint32, kappa uint32) ([]int32, []int32) {
 	v1 := make([]int32, n)
 	v2 := make([]int32, n)
 
 	for k := uint32(0); k < kappa; k++ {
-		index := cIndices[k]
+		index := int(cIndices[k])
 		var sign int32
 		/* \xi_i = sign(<v, si>) */
-		for i := uint32(0); i < n-index; i++ {
+		for i := 0; i < n-index; i++ {
 			sign += s1[i]*v1[index+i] + s2[i]*v2[index+i]
 		}
 		for i := n - index; i < n; i++ {
@@ -116,7 +119,7 @@ func greedySC(s1 []int32, s2 []int32, n uint32, cIndices []uint32, kappa uint32)
 		}
 		/* v = v - \xi_i . si */
 		if sign > 0 {
-			for i := uint32(0); i < n-index; i++ {
+			for i := 0; i < n-index; i++ {
 				v1[index+i] -= s1[i]
 				v2[index+i] -= s2[i]
 			}
@@ -125,7 +128,7 @@ func greedySC(s1 []int32, s2 []int32, n uint32, cIndices []uint32, kappa uint32)
 				v2[index+i-n] += s2[i]
 			}
 		} else {
-			for i := uint32(0); i < n-index; i++ {
+			for i := 0; i < n-index; i++ {
 				v1[index+i] += s1[i]
 				v2[index+i] += s2[i]
 			}
@@ -138,17 +141,17 @@ func greedySC(s1 []int32, s2 []int32, n uint32, cIndices []uint32, kappa uint32)
 	return v1, v2
 }
 
-func generateC(kappa uint32, nVector []int32, n uint32, hash []byte, hashSZ uint32) []uint32 {
+func generateC(kappa uint32, nVector []int32, n int, hash []byte) []uint32 {
 	indices := make([]uint32, kappa)
 
-	if n > 512 || hashSZ != 64+2*n {
+	if (n != 256 && n != 512) || len(hash) != 64+2*n {
 		panic("invalid params")
 	}
 	/*
 	 * append the n_vector to the hash array
 	 */
 	j := 64
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		// n_vector[i] is between 0 and modP (less than 2^16)
 		x := uint32(nVector[i])
 		hash[j] = byte(x & 255)
@@ -162,11 +165,10 @@ func generateC(kappa uint32, nVector []int32, n uint32, hash []byte, hashSZ uint
 		 * BD: just to be safe, we shouldn't overwrite the last element of hash
 		 * (so that n_vector[n-1] is taken into account).
 		 */
-		hash[hashSZ-1]++
+		hash[len(hash)-1]++
 		whash := sha3.Sum512(hash)
 
 		var array [512]byte
-
 		if n == 256 {
 			/* Bliss_b 0: we need kappa indices of 8 bits */
 			var i uint32
@@ -182,10 +184,6 @@ func generateC(kappa uint32, nVector []int32, n uint32, hash []byte, hashSZ uint
 				}
 			}
 		} else {
-			if n != 512 {
-				panic("invalid params n")
-			}
-
 			var extraBits byte // Prevent a GCC warning
 
 			/* We need kappa indices of 9 bits */
@@ -216,8 +214,15 @@ func generateC(kappa uint32, nVector []int32, n uint32, hash []byte, hashSZ uint
 }
 
 //Sign signs msg by pk.
-func (pk *PrivateKeyT) Sign(msg []byte, entropy *entropyT) *SignatureT {
+func (pk *PrivateKeyT) Sign(msg []byte) *SignatureT {
+	var seed [64]byte
+	if _, err := rand.Read(seed[:]); err != nil {
+		panic(err)
+	}
+	return pk.sign(msg, newEntropy(seed, blake2b.Sum512))
+}
 
+func (pk *PrivateKeyT) sign(msg []byte, entropy *entropyT) *SignatureT {
 	p := newBlissParams(pk.kind)
 	n := p.n
 
@@ -243,7 +248,7 @@ func (pk *PrivateKeyT) Sign(msg []byte, entropy *entropyT) *SignatureT {
 
 restart:
 
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		y1[i] = sampler.gauss()
 		y2[i] = sampler.gauss()
 	}
@@ -251,22 +256,22 @@ restart:
 	/* 2: compute v = ((2 * xi * a * y1) + y2) mod 2q */
 	v := state.multiply(y1, pk.a)
 
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		// this is v[i] = (2 * v[i] * xi + y2[i]) % q2
 		v[i] = smodq(2*v[i]*p.oneQ2+y2[i], p.q2)
 	}
 
 	/* 2b: drop bits modP */
 
-	if !checkarg(v, n, p.q2) {
+	if !checkarg(v, p.q2) {
 		panic("invalid args")
 	}
 	dv := dropBits(v, n, p.d)
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		dv[i] = smodq(dv[i], p.modP)
 	}
 
-	indices := generateC(p.kappa, dv, n, hash[:], hashSZ)
+	indices := generateC(p.kappa, dv, n, hash[:])
 
 	/* 4: (v1, v2) = greedySC(c) */
 
@@ -293,12 +298,12 @@ restart:
 	/* 6: (z1, z2) = (y1, y2) + (-1)^b * (v1, v2) */
 
 	if b {
-		for i := uint32(0); i < n; i++ {
+		for i := 0; i < n; i++ {
 			z1[i] = y1[i] - v1[i]
 			z2[i] = y2[i] - v2[i]
 		}
 	} else {
-		for i := uint32(0); i < n; i++ {
+		for i := 0; i < n; i++ {
 			z1[i] = y1[i] + v1[i]
 			z2[i] = y2[i] + v2[i]
 		}
@@ -314,18 +319,18 @@ restart:
 	}
 
 	/* 7: z2 = (drop_bits(v) - drop_bits(v - z2)) mod p  */
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		y1[i] = smodq(v[i]-z2[i], p.q2)
 	}
-	if !checkarg(v, n, p.q2) {
+	if !checkarg(v, p.q2) {
 		panic("invalid v")
 	}
 	v = dropBits(v, n, p.d) // drop_bits(v)
-	if !checkarg(y1, n, p.q2) {
+	if !checkarg(y1, p.q2) {
 		panic("invalid y1")
 	}
 	y1 = dropBits(y1, n, p.d) // drop_bits(v - z2)
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		z2[i] = v[i] - y1[i]
 		if z2[i] < -p.modP/2 {
 			z2[i] += p.modP
@@ -369,12 +374,12 @@ restart:
 
 	/* need to free some stuff */
 
-	secureFree(v)
-	secureFree(dv)
-	secureFree(y1)
-	secureFree(y2)
-	secureFree(v1)
-	secureFree(v2)
+	secureFreePolynomial(&v)
+	secureFree(&dv)
+	secureFree(&y1)
+	secureFree(&y2)
+	secureFree(&v1)
+	secureFree(&v2)
 
 	return sig
 }
@@ -426,44 +431,11 @@ func (pub *PublicKeyT) Verify(signature *SignatureT, msg []byte) error {
 	h := sha3.Sum512(msg)
 	copy(hash, h[:])
 
-	// if (false) {
-	//   printf("verify hash\n");
-	//   for i:=0; i<64; i++ {
-	// 	printf(" %d", hash[i]);
-	// 	if (i == 31) printf("\n");
-	//   }
-	//   printf("\n");
-	//   printf("verify: c_indices\n");
-	//   for (i=0; i<kappa; i++) {
-	// 	printf(" %d", c_indices[i]);
-	//   }
-	//   printf("\n");
-	//   printf("verify: z1\n");
-	//   for (i=0; i<n; i++) {
-	// 	printf(" %d", z1[i]);
-	// 	if ((i & 15) == 15) printf("\n");
-	//   }
-	//   printf("\n");
-	//   printf("verify: z2\n");
-	//   for (i=0; i<n; i++) {
-	// 	printf(" %d", z2[i]);
-	// 	if ((i & 15) == 15) printf("\n");
-	//   }
-	//   printf("\n\n");
-
-	//   printf("verify: public key\n");
-	//   for (i=0; i<n; i++) {
-	// 	printf(" %d", a[i]);
-	// 	if ((i & 15) == 15) printf("\n");
-	//   }
-	//   printf("\n");
-	// }
-
 	/* v = a * z1 */
 	v := state.multiply(z1, pub.a)
 
 	/* v = (1/(q + 2)) * a * z1 mod 2q */
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		if 0 > v[i] || v[i] >= p.q {
 			panic("invalid v")
 		}
@@ -476,41 +448,17 @@ func (pub *PublicKeyT) Verify(signature *SignatureT, msg []byte) error {
 		v[idx] = smodq(v[idx]+(p.q*p.oneQ2), p.q2) // TODO: store that in parameters?
 	}
 
-	// if (false) {
-	//   printf("verify: v before drop bits\n");
-	//   for i := uint32(0); i < n; i++{
-	// 	printf(" %d", v[i]);
-	// 	if ((i & 15) == 15) printf("\n");
-	//   }
-	// }
-
-	if !checkarg(v, n, p.q2) {
+	if !checkarg(v, p.q2) {
 		panic("invalid arg")
 	}
 	v = dropBits(v, n, p.d)
 
 	/*  v += z_2  mod p. */
-	for i := uint32(0); i < n; i++ {
+	for i := 0; i < n; i++ {
 		v[i] = smodq(v[i]+z2[i], p.modP)
 	}
 
-	// if (false) {
-	//   printf("verify: input to generateC\n");
-	//   for i := uint32(0); i < n; i++{
-	// 	printf(" %d", v[i]);
-	// 	if ((i & 31) == 31) printf("\n");
-	//   }
-	//   printf("\n");
-	// }
-	indices := generateC(p.kappa, v, p.n, hash[:], hashSZ)
-
-	// if false {
-	// 	printf("verify: indices after generateC\n")
-	// 	for i := uint32(0); i < kappa; i++ {
-	// 		printf(" %d", indices[i])
-	// 	}
-	// 	printf("\n")
-	// }
+	indices := generateC(p.kappa, v, p.n, hash[:])
 
 	for i := uint32(0); i < p.kappa; i++ {
 		if indices[i] != cIndices[i] {

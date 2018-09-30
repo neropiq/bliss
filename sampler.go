@@ -26,13 +26,15 @@ package bliss
 type samplerT struct {
 	entropy    *entropyT
 	c          []byte /* the table we will use for Boolean sampling (from tables.h) */
-	cdt        []byte /* the cumulative distribution table we will use (from cdtables.h) */
 	sigma      uint32 /* the standard deviation of the distribution */
 	ell        uint32 /* rows in the table     */
 	precision  uint32 /* precision used in computing the tables */
-	columns    uint32 /* columns = precision/8 */
 	ksigma     uint16 /* k_sigma = ceiling[ sqrt(2*ln 2) * sigma ]  */
 	ksigmaBits uint16 /* number of significant bits in k_sigma */
+}
+
+func (sampler *samplerT) columns() int {
+	return int(sampler.precision) / 8
 }
 
 /*
@@ -46,7 +48,6 @@ func newSampler(sigma uint32, ell uint32, precision uint32, entropy *entropyT) *
 		sigma:      sigma,
 		ell:        ell,
 		precision:  precision,
-		columns:    precision / 8,
 		c:          getTable(sigma, ell, precision),
 		ksigma:     getKSigma(sigma, precision),
 		ksigmaBits: getKSigmaBits(sigma, precision),
@@ -64,7 +65,7 @@ func (sampler *samplerT) ber(p []byte) bool {
 		panic("sampler and p must not be nil")
 	}
 
-	for i := uint32(0); i < sampler.columns; i++ {
+	for i := 0; i < sampler.columns(); i++ {
 		uc := sampler.entropy.randomUint8()
 		if uc < p[i] {
 			return true
@@ -83,7 +84,7 @@ func (sampler *samplerT) ber(p []byte) bool {
 func (sampler *samplerT) berExp(x uint32) bool {
 	ri := sampler.ell - 1
 	mask := uint32(1) << ri
-	row := ri * sampler.columns
+	row := int(ri) * sampler.columns()
 	for mask > 0 {
 		if x&mask != 0 {
 			bit := sampler.ber(sampler.c[row:])
@@ -92,7 +93,7 @@ func (sampler *samplerT) berExp(x uint32) bool {
 			}
 		}
 		mask >>= 1
-		row -= sampler.columns
+		row -= sampler.columns()
 	}
 
 	return true

@@ -26,6 +26,8 @@ package bliss
 import (
 	"crypto/rand"
 	"testing"
+
+	"golang.org/x/crypto/sha3"
 )
 
 var seed = [64]byte{
@@ -448,8 +450,8 @@ func TestKeys(t *testing.T) {
 	text = append(text, 0)
 
 	for _, kind := range []Kind{B0, B1, B2, B3, B4} {
-		entropy := newEntropy(seed)
-		pk := NewPrivateKey(kind, entropy)
+		entropy := newEntropy(seed, sha3.Sum512)
+		pk := newPrivateKey(kind, entropy)
 		r := result[kind]
 		if len(pk.s1) != len(r.s1) {
 			t.Error("length of s1 is invalid", len(pk.s1), len(r.s1))
@@ -484,7 +486,7 @@ func TestKeys(t *testing.T) {
 				t.Error("invalid a")
 			}
 		}
-		sig := pk.Sign(text, entropy)
+		sig := pk.sign(text, entropy)
 		rsig := resultSig[kind]
 		if len(sig.z1) != len(rsig.z1) {
 			t.Error("length of z1 is invalid")
@@ -529,14 +531,63 @@ func TestBliss(t *testing.T) {
 		if _, err := rand.Read(sd[:]); err != nil {
 			t.Error(err)
 		}
-		for _, kind := range []Kind{B0, B1, B2, B3, B4} {
-			entropy := newEntropy(sd)
-			pk := NewPrivateKey(kind, entropy)
+		for _, kind := range []Kind{B1, B2, B3, B4} {
+			pk := NewPrivateKey(kind, sd)
 			pub := pk.PublicKey()
-			sig := pk.Sign(text[:], entropy)
+			sig := pk.Sign(text[:])
 			if err := pub.Verify(sig, text[:]); err != nil {
 				t.Error(err)
 			}
 		}
+	}
+}
+
+func BenchmarkGen(b *testing.B) {
+	var text [1024]byte
+	var sd [64]byte
+	if _, err := rand.Read(text[:]); err != nil {
+		b.Error(err)
+	}
+	if _, err := rand.Read(sd[:]); err != nil {
+		b.Error(err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		pk := NewPrivateKey(B4, sd)
+		_ = pk.PublicKey()
+	}
+}
+func BenchmarkSign(b *testing.B) {
+	var text [1024]byte
+	var sd [64]byte
+	if _, err := rand.Read(text[:]); err != nil {
+		b.Error(err)
+	}
+	if _, err := rand.Read(sd[:]); err != nil {
+		b.Error(err)
+	}
+	pk := NewPrivateKey(B4, sd)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = pk.Sign(text[:])
+	}
+}
+
+func BenchmarkVeri(b *testing.B) {
+	var text [1024]byte
+	var sd [64]byte
+	if _, err := rand.Read(text[:]); err != nil {
+		b.Error(err)
+	}
+	if _, err := rand.Read(sd[:]); err != nil {
+		b.Error(err)
+	}
+	pk := NewPrivateKey(B4, sd)
+	pub := pk.PublicKey()
+	sig := pk.Sign(text[:])
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = pub.Verify(sig, text[:])
 	}
 }

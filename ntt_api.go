@@ -23,14 +23,15 @@
 
 package bliss
 
-import "errors"
+import (
+	"errors"
+)
 
 type polynomialT []int32
 type nttT []int32
 
 type nttStateT struct {
 	q int32   /* field modulus  */
-	n uint32  /* ring size (x^n+1)  */
 	w []int32 /* n roots of unity (mod q)  */
 	r []int32 /* w[i]/n (mod q)  */
 }
@@ -39,7 +40,6 @@ func newNtt(kind Kind) *nttStateT {
 	param := newBlissParams(kind)
 	return &nttStateT{
 		q: param.q,
-		n: param.n,
 		w: param.w,
 		r: param.r,
 	}
@@ -49,22 +49,20 @@ func (s *nttStateT) forward(input polynomialT) nttT {
 	if s == nil {
 		panic("state must not be nil")
 	}
-	output := ntt32xmu(s.n, s.q, input, s.w) /* multiply by powers of psi                  */
-	ntt32FFT(output, s.n, s.q, s.w)          /* result = ntt(input)                        */
+	output := ntt32xmu(s.q, input, s.w) /* multiply by powers of psi                  */
+	ntt32FFT(output, s.q, s.w)          /* result = ntt(input)                        */
 	return output
 }
+
 func (s *nttStateT) inverse(input nttT) polynomialT {
-	output := make(polynomialT, s.n)
+	output := make(polynomialT, len(input))
 	if s == nil {
 		panic("state must not be nil")
 	}
-	for i := uint32(0); i < s.n; i++ {
-		output[i] = input[i]
-	}
-
-	ntt32FFT(output, s.n, s.q, s.w)          /* result = ntt(input) = inverse ntt(poly) modulo reordering (input = ntt(poly)) */
-	output = ntt32xmu(s.n, s.q, output, s.r) /* multiply by powers of psi^-1  */
-	ntt32flp(output, s.n, s.q)               /* reorder: result mod q */
+	copy(output, input)
+	ntt32FFT(output, s.q, s.w)          /* result = ntt(input) = inverse ntt(poly) modulo reordering (input = ntt(poly)) */
+	output = ntt32xmu(s.q, output, s.r) /* multiply by powers of psi^-1  */
+	ntt32flp(output, s.q)               /* reorder: result mod q */
 	return output
 }
 
@@ -72,14 +70,14 @@ func (s *nttStateT) negate(inplace nttT) nttT {
 	if s == nil {
 		panic("state must not be nil")
 	}
-	return ntt32cmu(s.n, s.q, inplace, -1)
+	return ntt32cmu(s.q, inplace, -1)
 }
 
 func (s *nttStateT) product(lhs, rhs nttT) nttT {
 	if s == nil {
 		panic("state must not be nil")
 	}
-	return ntt32xmu(s.n, s.q, lhs, rhs) /* result = lhs * rhs (pointwise product) */
+	return ntt32xmu(s.q, lhs, rhs) /* result = lhs * rhs (pointwise product) */
 }
 
 func (s *nttStateT) invertPolynomial(input polynomialT) (nttT, error) {
@@ -87,7 +85,7 @@ func (s *nttStateT) invertPolynomial(input polynomialT) (nttT, error) {
 		panic("state must not be nil")
 	}
 	output := s.forward(input)
-	for i := uint32(0); i < s.n; i++ {
+	for i := range input {
 		x := output[i]
 		if x == 0 {
 			return nil, errors.New("not invertible")

@@ -23,6 +23,8 @@
 
 package bliss
 
+import "golang.org/x/crypto/blake2b"
+
 /*PrivateKeyT is a bliss-b private key
  *
  * The only reason we do not declare s1,s2, and a to be [512] arrays
@@ -50,7 +52,7 @@ type PublicKeyT struct {
    - nz2: the number of coefficients that are +-2
    - entropy: an initialized source of randomness
 */
-func uniformPoly(n, nz1, nz2 uint32, entropy *entropyT) []int32 {
+func uniformPoly(n int, nz1, nz2 uint32, entropy *entropyT) []int32 {
 	v := make([]int32, n)
 	for i := int32(0); i < int32(nz1); {
 		x := int32(entropy.randomUint16())
@@ -76,7 +78,12 @@ func uniformPoly(n, nz1, nz2 uint32, entropy *entropyT) []int32 {
  *        sign key is    f, g small and f invertible
  *        public key is  a_q = -(2g-1)/f mod q = (2g'+1)/f
  */
-func NewPrivateKey(kind Kind, entropy *entropyT) *PrivateKeyT {
+func NewPrivateKey(kind Kind, seed [64]byte) *PrivateKeyT {
+	ent := newEntropy(seed, blake2b.Sum512)
+	return newPrivateKey(kind, ent)
+}
+
+func newPrivateKey(kind Kind, entropy *entropyT) *PrivateKeyT {
 	p := newBlissParams(kind)
 	/* we calloc so we do not have to zero them out later */
 	pk := &PrivateKeyT{
@@ -91,7 +98,7 @@ func NewPrivateKey(kind Kind, entropy *entropyT) *PrivateKeyT {
 	pk.s2 = uniformPoly(p.n, p.nz1, p.nz2, entropy)
 
 	/* g = 2g - 1   N.B the Bliss-B paper uses 2g + 1 */
-	for i := uint32(0); i < p.n; i++ {
+	for i := 0; i < p.n; i++ {
 		pk.s2[i] *= 2
 	}
 	pk.s2[0]--
@@ -121,8 +128,8 @@ func NewPrivateKey(kind Kind, entropy *entropyT) *PrivateKeyT {
 		/* currently storing the pk.a in ntt form */
 		pk.a = state.forward(pk.a)
 
-		secureFree(t)
-		secureFree(u)
+		secureFreeNTT(&t)
+		secureFree(&u)
 
 		return pk
 	}

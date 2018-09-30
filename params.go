@@ -38,7 +38,7 @@ const (
 type blissParamT struct {
 	kind  Kind   /* the kind of bliss-b (i.e. *this* choice of parameters)  */
 	q     int32  /* field modulus  */
-	n     uint32 /* ring size (x^n+1)  */
+	n     int    /* ring size (x^n+1)  */
 	d     uint32 /* bit drop shift  */
 	modP  int32  /* magic modulus  (derived from d) */
 	q2    int32  /* 2 * field modulus  */

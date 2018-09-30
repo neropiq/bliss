@@ -30,18 +30,25 @@ const (
 	Bytes          = 128
 )
 
-func secureFree(ptr []int32) {
-	for i := range ptr {
-		ptr[i] = 0
+func secureFreePolynomial(ptr *polynomialT) {
+	for i := range *ptr {
+		(*ptr)[i] = 0
 	}
-	ptr = nil
+	(*ptr) = nil
 }
-func secureFreeU(ptr []uint32) {
-	for i := range ptr {
-		ptr[i] = 0
+func secureFreeNTT(ptr *nttT) {
+	for i := range *ptr {
+		(*ptr)[i] = 0
 	}
-	ptr = nil
+	(*ptr) = nil
 }
+func secureFree(ptr *[]int32) {
+	for i := range *ptr {
+		(*ptr)[i] = 0
+	}
+	(*ptr) = nil
+}
+
 func vectorMaxNorm(v []int32) int32 {
 	var max int32
 

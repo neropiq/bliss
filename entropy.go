@@ -25,8 +25,6 @@ package bliss
 
 import (
 	"encoding/binary"
-
-	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -34,6 +32,8 @@ const (
 	hashLengthUint16 = 64 / 2
 	hashLengthUint64 = 64 / 8
 )
+
+type sum512 func([]byte) [64]byte
 
 type entropyT struct {
 	bitPool    uint64
@@ -45,6 +45,7 @@ type entropyT struct {
 	charIndex  uint32
 	int16Index uint32
 	int64Index uint32
+	sum512     sum512
 }
 
 /*
@@ -70,7 +71,7 @@ func (entropy *entropyT) incrementSeed() {
 func (entropy *entropyT) refresh(n uint) []byte {
 	hash := make([]byte, n*64)
 	for i := uint(0); i < n; i++ {
-		d := sha3.Sum512(entropy.seed[:])
+		d := entropy.sum512(entropy.seed[:])
 		copy(hash[i*64:], d[:])
 		entropy.incrementSeed()
 	}
@@ -176,10 +177,7 @@ func (entropy *entropyT) randomBit() bool {
 	entropy.bitPool >>= 1
 	entropy.bitIndex++
 
-	if bit == 0 {
-		return false
-	}
-	return true
+	return bit != 0
 }
 
 /*
@@ -210,9 +208,10 @@ func (entropy *entropyT) randomBits(n uint32) uint32 {
  * Initialize: with the given seed
  * - seed must be an array of SHA3_512_DIGEST_LENGTH bytes
  */
-func newEntropy(seed [64]uint8) *entropyT {
+func newEntropy(seed [64]uint8, s sum512) *entropyT {
 	entropy := &entropyT{
-		seed: seed,
+		seed:   seed,
+		sum512: s,
 	}
 	entropy.charPoolRefresh()
 	entropy.int16PoolRefresh()

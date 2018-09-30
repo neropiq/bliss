@@ -30,14 +30,6 @@ import (
 	"testing"
 )
 
-func average(t []float64) float64 {
-	acc := 0.0
-	for _, tt := range t {
-		acc += tt / float64(len(t))
-	}
-	return acc
-}
-
 /*
  * https://blogs.msdn.microsoft.com/devdev/2005/12/12/integer-division-by-constants/
  *

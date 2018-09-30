@@ -315,7 +315,7 @@ var cbliss271_22_128 = []byte{
 
 /*
  * crufty error checking for now
- * return NULL for parameters we don't support
+ * panic for parameters we don't support
  */
 func getTable(sigma uint32, ell uint32, precision uint32) []byte {
 	if ell < 19 || ell > 22 {
