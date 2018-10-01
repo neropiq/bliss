@@ -27,12 +27,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
-/*PrivateKeyT is a bliss-b private key
- *
- * The only reason we do not declare s1,s2, and a to be [512] arrays
- * is that down the track we may need to beef n up to say 1024 and beyond.
- * so this way we are flexible, and stay less committed to a fixed n.
- */
+//PrivateKeyT is a bliss-b private key
 type PrivateKeyT struct {
 	kind Kind    /* the kind of bliss       */
 	s1   []int32 /* sparse polynomial s1    */
@@ -74,12 +69,13 @@ func uniformPoly(n int, nz1, nz2 uint32, entropy *entropyT) []int32 {
 	return v
 }
 
-//NewPrivateKey return a private key for BLISS_B.
 /**
- * Bliss-b public and sign key generation
- *        sign key is    f, g small and f invertible
- *        public key is  a_q = -(2g-1)/f mod q = (2g'+1)/f
- */
+  Bliss-b public and sign key generation
+         sign key is    f, g small and f invertible
+         public key is  a_q = -(2g-1)/f mod q = (2g'+1)/f
+*/
+
+//NewPrivateKey return a private key for BLISS_B.
 func NewPrivateKey(kind Kind, seed [64]byte) *PrivateKeyT {
 	ent := newEntropy(seed, blake2b.Sum512)
 	return newPrivateKey(kind, ent)

@@ -23,13 +23,6 @@
 
 package bliss
 
-//Params for blissB
-const (
-	SecretBytes    = 256
-	PublicKeyBytes = 85
-	Bytes          = 128
-)
-
 func secureFreePolynomial(ptr *polynomialT) {
 	for i := range *ptr {
 		(*ptr)[i] = 0
