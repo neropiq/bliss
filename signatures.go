@@ -172,7 +172,7 @@ func generateC(kappa uint32, nVector []int32, n int, hash []byte) []uint32 {
 		if n == 256 {
 			/* Bliss_b 0: we need kappa indices of 8 bits */
 			var i uint32
-			for j := 0; j < 64; j++ {
+			for j = 0; j < 64; j++ {
 				index := whash[j]
 				if array[index] == 0 {
 					indices[i] = uint32(index)

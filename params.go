@@ -30,8 +30,8 @@ type Kind byte
 
 /*Names for the five varieties of bliss-b */
 const (
-	B0 Kind = iota
-	B1
+	// B0 Kind = iota //since cannot seirialize B0 sig.
+	B1 Kind = iota + 1
 	B2
 	B3
 	B4
@@ -374,8 +374,8 @@ var blissBParams = []*ParamT{
 
 	/* bliss-b 0 */
 	&ParamT{
-		kind:      B0,   /* kind */
-		q:         7681, /* q */
+		kind:      Kind(0), /* kind */
+		q:         7681,    /* q */
 		qBits:     13,
 		n:         256, /* n */
 		nBits:     8,
@@ -518,7 +518,7 @@ var blissBParams = []*ParamT{
 
 //GetParam get a param of kind.
 func GetParam(kind Kind) (*ParamT, error) {
-	if B0 <= kind && kind <= B4 {
+	if B1 <= kind && kind <= B4 {
 		return blissBParams[kind], nil
 	}
 	return nil, errors.New("invalid bliss kind")
@@ -539,5 +539,5 @@ func (p *ParamT) SigSize() int {
 	return nbits/8 + 1 + 1
 }
 func (p *ParamT) z2bits() uint {
-	return uint(p.bBits) - uint(p.d)
+	return p.bBits - uint(p.d)
 }

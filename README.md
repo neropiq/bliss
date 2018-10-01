@@ -30,9 +30,11 @@ are required to compile this.
 	pk := NewPrivateKey(bliss.B4, seed)
 	pub := pk.PublicKey()
 	sig := pk.Sign(text)
-	if err := pub.Verify(sig, text); err != nil {
-        ...
-	}
+	err := pub.Verify(sig, text)
+	bpub := pub.Bytes()
+	bsig := sig.Bytes()
+	pub2, err := NewPublicKey(bpub)
+	sig2, err := NewSignature(bsig)
 
 ```
 

@@ -22,66 +22,66 @@ package bliss
 
 import (
 	"bytes"
-	"compress/flate"
 	"errors"
-	"io"
-	"io/ioutil"
-	"log"
-	"math/big"
+
+	"github.com/AidosKuneen/bliss/bit"
 )
 
 //Bytes serialize Publickey.
 func (p *PublicKeyT) Bytes() []byte {
-	var r big.Int
+	var buf bytes.Buffer
+	w := bit.NewWriter(&buf)
+
+	if err := w.Write(uint64(p.kind), 3); err != nil {
+		panic(err)
+	}
 	stat := newNtt(p.kind)
 	param, err := GetParam(p.kind)
 	if err != nil {
 		panic(err)
 	}
 	a := stat.inverse(p.a)
-	for i := range a {
-		r.Lsh(&r, param.qBits)
-		t := a[param.n-1-i]
-		tt := big.NewInt(int64(t))
-		r.Or(&r, tt)
+	for _, t := range a {
+		if err := w.Write(uint64(t), param.qBits); err != nil {
+			panic(err)
+		}
 	}
-	r.Lsh(&r, 3)
-	tt := big.NewInt(int64(p.kind))
-	r.Or(&r, tt)
-	b := r.Bytes()
-	bb := make([]byte, param.PKSize())
-	log.Println(param.PKSize(), len(b))
-	copy(bb[param.PKSize()-len(b):], b)
-	return bb
+	if err := w.Close(); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
 }
 
 //NewPublicKey creates an Publickey from serialized bytes.
 func NewPublicKey(b []byte) (*PublicKeyT, error) {
-	var r big.Int
-	r.SetBytes(b)
-	var v big.Int
-	mask := ^(^0 << uint(3))
-	maskQ := big.NewInt(int64(mask))
-	v.And(&r, maskQ)
-	kind := Kind(v.Uint64())
-	r.Rsh(&r, 3)
-	param, err := GetParam(kind)
+	//check before setbytes to ensure that the data is not too big
+	if len(b) > blissBParams[4].PKSize() {
+		return nil, errors.New("invalid length of data")
+	}
+
+	buf := bytes.NewBuffer(b)
+	r := bit.NewReader(buf)
+	kind, err := r.Read(3)
+	if err != nil {
+		return nil, err
+	}
+	param, err := GetParam(Kind(kind))
 	if err != nil {
 		return nil, err
 	}
 	p := &PublicKeyT{
-		kind: kind,
+		kind: param.kind,
 		a:    make([]int32, param.n),
 	}
 	if len(b) != param.PKSize() {
 		return nil, errors.New("invalid length of bytes for PK")
 	}
-	mask = ^(^0 << param.qBits)
-	maskQ = big.NewInt(int64(mask))
 	for i := range p.a {
-		v.And(&r, maskQ)
-		p.a[i] = int32(v.Uint64())
-		r.Rsh(&r, param.qBits)
+		a, err := r.Read(param.qBits)
+		if err != nil {
+			return nil, err
+		}
+		p.a[i] = int32(a)
 	}
 	stat := newNtt(p.kind)
 	p.a = stat.forward(p.a)
@@ -94,99 +94,144 @@ func (s *SignatureT) Bytes() []byte {
 	if err != nil {
 		panic(err)
 	}
-	var r big.Int
-	for i := range s.c {
-		r.Lsh(&r, param.nBits)
-		t := s.c[int(param.kappa)-1-i]
-		tt := big.NewInt(int64(t))
-		r.Or(&r, tt)
+	var buf bytes.Buffer
+	w := bit.NewWriter(&buf)
+
+	//kind
+	if err = w.Write(uint64(s.kind), 3); err != nil {
+		panic(err)
 	}
-	for i := range s.z2 {
-		r.Lsh(&r, param.z2bits())
-		t := s.z2[param.n-1-i]
-		if t < 0 {
-			t = -t
-			t |= 1 << (param.z2bits() - 1)
-		}
-		tt := big.NewInt(int64(t))
-		r.Or(&r, tt)
-	}
+
+	//compressed z1 and z2
+	rs := make([]byte, param.n)
+	mask1 := (1 << (param.bBits - 8 - 1)) - 1
 	for i := range s.z1 {
-		r.Lsh(&r, param.bBits)
-		t := s.z1[param.n-1-i]
+		z1 := s.z1[i]
+		z2 := s.z2[i]
+		if z1 < 0 {
+			z1 = -z1
+		}
+		if z2 < 0 {
+			z2 = -z2
+			z2 |= 1 << 3
+		}
+		z1 = (z1 >> 8) & int32(mask1)
+		rs[i] = byte((z1 << 4) | z2)
+	}
+	// cmp, err := compress(rs)
+	cmp, bitlen, err := encodeHuff(param.kind, rs)
+	if err != nil {
+		panic(err)
+	}
+	if err := w.Write(uint64(bitlen), param.nBits+3); err != nil {
+		panic(err)
+	}
+	if err := w.WriteBytes(cmp); err != nil {
+		panic(err)
+	}
+
+	for _, t := range s.z1 {
 		if t < 0 {
 			t = -t
-			t |= int32(1) << (param.bBits - 1)
+			t = t & 0xff
+			t |= int32(1) << 8
+		} else {
+			t = t & 0xff
 		}
-		tt := big.NewInt(int64(t))
-		r.Or(&r, tt)
+		if err := w.Write(uint64(t), 9); err != nil {
+			panic(err)
+		}
 	}
-	r.Lsh(&r, 3)
-	tt := big.NewInt(int64(s.kind))
-	r.Or(&r, tt)
-	b := r.Bytes()
-	bb := make([]byte, param.SigSize())
-	log.Println(param.SigSize(), len(b))
-	copy(bb[param.SigSize()-len(b):], b)
-	return bb
+
+	for _, c := range s.c {
+		if err := w.Write(uint64(c), param.nBits); err != nil {
+			panic(err)
+		}
+	}
+
+	if err := w.Close(); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
 }
 
 //NewSignature creates an SiningKey from serialized bytes.
 func NewSignature(b []byte) (*SignatureT, error) {
-	var r big.Int
-	r.SetBytes(b)
-	var v big.Int
-	mask := ^(^0 << uint(3))
-	maskQ := big.NewInt(int64(mask))
-	v.And(&r, maskQ)
-	kind := Kind(v.Uint64())
-	r.Rsh(&r, 3)
-	param, err := GetParam(kind)
+	//check before setbytes to ensure that the data is not too big
+	// if len(b) > blissBParams[4].SigSize() {
+	// 	return nil, errors.New("invalid length of data")
+	// }
+	r := bit.NewReader(bytes.NewBuffer(b))
+
+	kind, err := r.Read(3)
 	if err != nil {
 		return nil, err
 	}
-	if len(b) != param.SigSize() {
-		return nil, errors.New("invalid length of bytes for SK")
+	param, err := GetParam(Kind(kind))
+	if err != nil {
+		return nil, err
 	}
+	// if len(b) > param.SigSize() {
+	// 	return nil, errors.New("invalid length of bytes for signature")
+	// }
 	s := &SignatureT{
-		kind: kind,
+		kind: param.kind,
 		z1:   make([]int32, param.n),
 		z2:   make([]int32, param.n),
 		c:    make([]uint32, param.kappa),
 	}
-	mask = ^(^0 << param.bBits)
-	maskQ = big.NewInt(int64(mask))
-	clearTop := ^(^uint64(0) << (param.bBits - 1))
+	bitlen, err := r.Read(param.nBits + 3)
+	if err != nil {
+		return nil, err
+	}
+
+	bytelen := bitlen / 8
+	if bitlen%8 != 0 {
+		bytelen++
+	}
+	cmp, err := r.ReadBytes(int(bytelen))
+	if err != nil {
+		return nil, err
+	}
+
+	// unc, err := extract(cmp)
+	unc, err := decodeHuff(param.kind, cmp, int(bitlen))
+	if err != nil {
+		return nil, err
+	}
+	if len(unc) != param.n {
+		return nil, errors.New("invalid lengh of compressed data")
+	}
+	clearTop32 := (int32(1) << 3) - 1
+	for i, u := range unc {
+		s.z1[i] = (int32(u&0xf0) >> 4) << 8
+		z2 := int32(u & 0x0f)
+		if z2&(1<<3) != 0 {
+			s.z2[i] = -(z2 & clearTop32)
+		} else {
+			s.z2[i] = z2 & clearTop32
+		}
+	}
+
+	clearTop := uint64(^(^0 << 8))
 	for i := range s.z1 {
-		v.And(&r, maskQ)
-		z1 := v.Uint64()
-		s.z1[i] = int32(z1 & clearTop)
-		if z1&(1<<(param.bBits-1)) != 0 {
+		z1, err := r.Read(9)
+		if err != nil {
+			return nil, err
+		}
+		s.z1[i] |= int32(z1 & clearTop)
+		if z1&(1<<8) != 0 {
 			s.z1[i] = -s.z1[i]
 		}
-		r.Rsh(&r, param.bBits)
 	}
-	mask = ^(^0 << param.z2bits())
-	maskQ = big.NewInt(int64(mask))
-	clearTop = ^(^uint64(0) << (param.z2bits() - 1))
-	for i := range s.z2 {
-		v.And(&r, maskQ)
-		z2 := v.Uint64()
-		s.z2[i] = int32(z2 & clearTop)
-		if z2&(1<<(param.z2bits()-1)) != 0 {
-			s.z2[i] = -s.z2[i]
-		}
-		r.Rsh(&r, param.z2bits())
-	}
-	mask = ^(^0 << param.nBits)
-	maskQ = big.NewInt(int64(mask))
+
 	clearTop = ^(^uint64(0) << param.nBits)
 	for i := range s.c {
-		var v big.Int
-		v.And(&r, maskQ)
-		c := v.Uint64()
+		c, err := r.Read(param.nBits)
+		if err != nil {
+			return nil, err
+		}
 		s.c[i] = uint32(c & clearTop)
-		r.Rsh(&r, param.nBits)
 	}
 	return s, s.check(param)
 }
@@ -225,26 +270,39 @@ func (s *SignatureT) check(p *ParamT) error {
 		}
 	}
 	for _, c := range s.c {
-		if c < 0 || c >= uint32(p.n) {
+		if c >= uint32(p.n) {
 			return errors.New("invalid c")
 		}
 	}
 	return nil
 }
 
-func compress(r []byte) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	zw, err := flate.NewWriter(buf, flate.BestSpeed)
-	if err != nil {
-		return nil, err
-	}
-	defer zw.Close()
-	_, err = zw.Write(r)
-	return buf.Bytes(), err
-}
+// func compress(r []byte) ([]byte, error) {
+// 	buf := new(bytes.Buffer)
+// 	err2 := func() error {
+// 		zw, err := flate.NewWriter(buf, flate.HuffmanOnly)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		defer zw.Close()
+// 		n, err := zw.Write(r)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		if n != len(r) {
+// 			return errors.New("coulnd compress")
+// 		}
+// 		return nil
+// 	}()
+// 	if err2 != nil {
+// 		return nil, err2
+// 	}
+// 	return buf.Bytes(), nil
+// }
 
-func extract(zr io.Reader) ([]byte, error) {
-	r := flate.NewReader(zr)
-	defer r.Close()
-	return ioutil.ReadAll(r)
-}
+// func extract(zr []byte) ([]byte, error) {
+// 	buf := bytes.NewBuffer(zr)
+// 	r := flate.NewReader(buf)
+// 	defer r.Close()
+// 	return ioutil.ReadAll(r)
+// }
