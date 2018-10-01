@@ -38,6 +38,31 @@ are required to compile this.
 
 ```
 
+
+## Performance
+
+Using the following test environment...
+
+```
+* Compiler: go version go1.11 linux/amd64
+* Kernel: Linux  4.18.9-arch1-1-ARCH #1 SMP PREEMPT Wed Sep 19 21:19:17 UTC 2018 x86_64 GNU/Linux
+* CPU:  Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz 
+* Memory: 8 GB
+```
+
+
+For signing, it takes about 825 uS.
+
+For verification, it takes about 78 uS.
+
+```
+BenchmarkGen-8    	   10000	    172539 ns/op
+BenchmarkSign-8   	    2000	    824865 ns/op
+BenchmarkVeri-8   	   20000	     78212 ns/op
+```
+
+
+
 ## Contribution
 Improvements to the codebase and pull requests are encouraged.
 
