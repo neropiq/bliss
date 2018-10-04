@@ -24,6 +24,9 @@
 package bliss
 
 import (
+	"encoding/json"
+
+	"github.com/vmihailenco/msgpack"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -149,4 +152,100 @@ func (pk *PrivateKeyT) PublicKey() *PublicKeyT {
 	copy(pub.a, pk.a)
 
 	return pub
+}
+
+type privateKeyT struct {
+	Kind Kind    /* the kind of bliss       */
+	S1   []int32 /* sparse polynomial s1    */
+	S2   []int32 /* sparse polynomial s2    */
+	A    []int32 /* NTT of s1/s2            */
+}
+
+//MarshalJSON  marshals PrivateKeyT into valid JSON.
+func (pk *PrivateKeyT) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&privateKeyT{
+		Kind: pk.kind,
+		S1:   pk.s1,
+		S2:   pk.s2,
+		A:    pk.a,
+	})
+}
+
+//UnmarshalJSON  unmarshals JSON to PrivateKeyT.
+func (pk *PrivateKeyT) UnmarshalJSON(b []byte) error {
+	var s privateKeyT
+	err := json.Unmarshal(b, &s)
+	if err == nil {
+		pk.kind = s.Kind
+		pk.s1 = s.S1
+		pk.s2 = s.S2
+		pk.a = s.A
+	}
+	return err
+}
+
+//EncodeMsgpack  marshals PrivateKeyT into valid JSON.
+func (pk *PrivateKeyT) EncodeMsgpack(enc *msgpack.Encoder) error {
+	return enc.Encode(&privateKeyT{
+		Kind: pk.kind,
+		S1:   pk.s1,
+		S2:   pk.s2,
+		A:    pk.a,
+	})
+}
+
+//DecodeMsgpack  unmarshals JSON to SigningKey.
+func (pk *PrivateKeyT) DecodeMsgpack(dec *msgpack.Decoder) error {
+	var s privateKeyT
+	err := dec.Decode(&s)
+	if err == nil {
+		pk.kind = s.Kind
+		pk.s1 = s.S1
+		pk.s2 = s.S2
+		pk.a = s.A
+	}
+	return err
+}
+
+type publicKeyT struct {
+	Kind Kind    /* the kind of bliss       */
+	A    []int32 /* NTT of s1/s2           */
+}
+
+//MarshalJSON  marshals PrivateKeyT into valid JSON.
+func (pub *PublicKeyT) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&publicKeyT{
+		Kind: pub.kind,
+		A:    pub.a,
+	})
+}
+
+//UnmarshalJSON  unmarshals JSON to PrivateKeyT.
+func (pub *PublicKeyT) UnmarshalJSON(b []byte) error {
+	var s publicKeyT
+	err := json.Unmarshal(b, &s)
+	if err == nil {
+		pub.kind = s.Kind
+		pub.a = s.A
+	}
+	return err
+}
+
+//EncodeMsgpack  marshals PrivateKeyT into valid JSON.
+func (pub *PublicKeyT) EncodeMsgpack(enc *msgpack.Encoder) error {
+	return enc.Encode(&publicKeyT{
+		Kind: pub.kind,
+		A:    pub.a,
+	})
+}
+
+//DecodeMsgpack  unmarshals JSON to SigningKey.
+func (pub *PublicKeyT) DecodeMsgpack(dec *msgpack.Decoder) error {
+	var s publicKeyT
+	err := dec.Decode(&s)
+	if err == nil {
+		pub.kind = s.Kind
+		pub.a = s.A
+	}
+	return err
 }
