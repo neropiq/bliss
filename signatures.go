@@ -29,8 +29,6 @@ import (
 	"fmt"
 	"log"
 
-	"golang.org/x/crypto/blake2b"
-
 	"golang.org/x/crypto/sha3"
 )
 
@@ -104,8 +102,7 @@ func dropBits(input []int32, n int, d uint32) []int32 {
  *
  */
 func greedySC(s1 []int32, s2 []int32, n int, cIndices []uint32, kappa uint32) ([]int32, []int32) {
-	v1 := make([]int32, n)
-	v2 := make([]int32, n)
+	var v1, v2 [512]int32
 
 	for k := uint32(0); k < kappa; k++ {
 		index := int(cIndices[k])
@@ -138,7 +135,7 @@ func greedySC(s1 []int32, s2 []int32, n int, cIndices []uint32, kappa uint32) ([
 			}
 		}
 	}
-	return v1, v2
+	return v1[:], v2[:]
 }
 
 func generateC(kappa uint32, nVector []int32, n int, hash []byte) []uint32 {
@@ -219,7 +216,7 @@ func (pk *PrivateKeyT) Sign(msg []byte) *SignatureT {
 	if _, err := rand.Read(seed[:]); err != nil {
 		panic(err)
 	}
-	return pk.sign(msg, newEntropy(seed, blake2b.Sum512))
+	return pk.sign(msg, newEntropy(seed, false))
 }
 
 func (pk *PrivateKeyT) sign(msg []byte, entropy *entropyT) *SignatureT {
@@ -233,7 +230,7 @@ func (pk *PrivateKeyT) sign(msg []byte, entropy *entropyT) *SignatureT {
 	state := newNtt(pk.kind)
 
 	/* initialize our sampler */
-	sampler := newSampler(p.sigma, p.ell, p.precision, entropy)
+	sampler := newSampler(p.sigma, p.ell, entropy)
 
 	/* make working space */
 	hashSZ := 64 + 2*n
@@ -296,11 +293,11 @@ restart:
 	}
 
 	/* 5: choose a random bit b */
-	b := entropy.randomBit()
+	b := entropy.randomBits(1)
 
 	/* 6: (z1, z2) = (y1, y2) + (-1)^b * (v1, v2) */
 
-	if b {
+	if b == 1 {
 		for i := 0; i < n; i++ {
 			z1[i] = y1[i] - v1[i]
 			z2[i] = y2[i] - v2[i]

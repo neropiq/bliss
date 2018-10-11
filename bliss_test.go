@@ -26,8 +26,6 @@ package bliss
 import (
 	"crypto/rand"
 	"testing"
-
-	"golang.org/x/crypto/sha3"
 )
 
 var seed = [64]byte{
@@ -450,7 +448,7 @@ func TestKeys(t *testing.T) {
 	text = append(text, 0)
 
 	for _, kind := range []Kind{B1, B2, B3, B4} {
-		entropy := newEntropy(seed, sha3.Sum512)
+		entropy := newEntropy(seed, true)
 		pk := newPrivateKey(kind, entropy)
 		r := result[kind]
 		if len(pk.s1) != len(r.s1) {

@@ -51,14 +51,14 @@ Using the following test environment...
 ```
 
 
-For signing, it takes about 825 uS.
+For signing, it takes about 670 μS.
 
-For verification, it takes about 78 uS.
+For verification, it takes about 82 μS.
 
 ```
-BenchmarkGen-8    	   10000	    172539 ns/op
-BenchmarkSign-8   	    2000	    824865 ns/op
-BenchmarkVeri-8   	   20000	     78212 ns/op
+BenchmarkGen-8    	   10000	    172875 ns/op	   25811 B/op	      17 allocs/op
+BenchmarkSign-8   	    2000	    674769 ns/op	   62103 B/op	      63 allocs/op
+BenchmarkVeri-8   	   20000	     81750 ns/op	   15648 B/op	      16 allocs/op
 ```
 
 

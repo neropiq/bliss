@@ -37,6 +37,11 @@ const (
 	B4
 )
 
+const (
+	precision = 64
+	columns   = precision / 8
+)
+
 //ParamT is a param for each BlissB0~B4
 type ParamT struct {
 	kind  Kind  /* the kind of bliss-b (i.e. *this* choice of parameters)  */
@@ -74,8 +79,7 @@ type ParamT struct {
 	/*
 	 * parameters used by the sampler (in addition to sigma)
 	 */
-	ell       uint32 /* number of rows in table for Gaussian sampling */
-	precision uint32 /* 8 * number of columns in the table */
+	ell uint32 /* number of rows in table for Gaussian sampling */
 }
 
 /*
@@ -374,145 +378,140 @@ var blissBParams = []*ParamT{
 
 	/* bliss-b 0 */
 	&ParamT{
-		kind:      Kind(0), /* kind */
-		q:         7681,    /* q */
-		qBits:     13,
-		n:         256, /* n */
-		nBits:     8,
-		d:         5,      /* d */
-		modP:      480,    /* mod_p */
-		q2:        15362,  /* 2 * field modulus  */
-		qInv:      559167, /* floor(2^32/q)      */
-		q2Inv:     279583, /* floor(2^32/q2)     */
-		oneQ2:     3841,   /* 1/(q + 2) mod 2q   */
-		kappa:     12,     /* kappa */
-		bInf:      530,    /* b_inf */
-		bBits:     10 + 1,
-		bL2:       2492 * 2492, /* L2 norm */
-		nz1:       141,         /* nz1 */
-		nz2:       39,          /* nz2 */
-		sigma:     100,         /* sigma */
-		bigM:      17928,       /* M  (actually p_max. see workings below) */
-		m:         2.44,        /* m  = repetition rate alpha 0.748   M = 17840  */
-		w:         w7681n256,   /* w */
-		r:         r7681n256,   /* r */
-		ell:       19,          /* ell (computed by tools/ell) */
-		precision: 64,          /* precision */
+		kind:  Kind(0), /* kind */
+		q:     7681,    /* q */
+		qBits: 13,
+		n:     256, /* n */
+		nBits: 8,
+		d:     5,      /* d */
+		modP:  480,    /* mod_p */
+		q2:    15362,  /* 2 * field modulus  */
+		qInv:  559167, /* floor(2^32/q)      */
+		q2Inv: 279583, /* floor(2^32/q2)     */
+		oneQ2: 3841,   /* 1/(q + 2) mod 2q   */
+		kappa: 12,     /* kappa */
+		bInf:  530,    /* b_inf */
+		bBits: 10 + 1,
+		bL2:   2492 * 2492, /* L2 norm */
+		nz1:   141,         /* nz1 */
+		nz2:   39,          /* nz2 */
+		sigma: 100,         /* sigma */
+		bigM:  17928,       /* M  (actually p_max. see workings below) */
+		m:     2.44,        /* m  = repetition rate alpha 0.748   M = 17840  */
+		w:     w7681n256,   /* w */
+		r:     r7681n256,   /* r */
+		ell:   19,          /* ell (computed by tools/ell) */
 	},
 
 	/* bliss-b 1 */
 	&ParamT{
-		kind:      B1,    /* kind */
-		q:         12289, /* q */
-		qBits:     14,
-		n:         512, /* n */
-		nBits:     9,
-		d:         10,     /* d */
-		modP:      24,     /* mod_p */
-		q2:        24578,  /* q2 = 2 * field modulus  */
-		qInv:      349496, /* q_inv = floor(2^32/q) */
-		q2Inv:     174748, /* q2_inv = floor(2^32/q2) */
-		oneQ2:     6145,   /* one_q2 = 1/(q + 2) mod 2q */
-		kappa:     23,     /* kappa */
-		bInf:      2100,   /* b_inf */
-		bBits:     12 + 1,
-		bL2:       12872 * 12872, /* b_l2 = square of L2 norm */
-		nz1:       154,           /* nz1 = number of coeffs equal to +/-1 in the private key */
-		nz2:       0,             /* nz2 = number of coeffs equal to +/-2 */
-		sigma:     215,           /* sigma */
-		bigM:      17825,         /* M  (actually p_max. see workings below)  */
-		m:         1.21,          /* m = repetition rate BLISS  strongswan .M = 46539, with alpha = 1.000. BLISS-B .M = 17954, with alpha = 1.610 (we get 17623) */
-		w:         w12289n512,    /* w = powers of omega  (for NTT) */
-		r:         r12289n512,    /* r = powers of omeag/n (for inverse NTT) */
-		ell:       21,            /* ell */
-		precision: 64,            /* precision */
+		kind:  B1,    /* kind */
+		q:     12289, /* q */
+		qBits: 14,
+		n:     512, /* n */
+		nBits: 9,
+		d:     10,     /* d */
+		modP:  24,     /* mod_p */
+		q2:    24578,  /* q2 = 2 * field modulus  */
+		qInv:  349496, /* q_inv = floor(2^32/q) */
+		q2Inv: 174748, /* q2_inv = floor(2^32/q2) */
+		oneQ2: 6145,   /* one_q2 = 1/(q + 2) mod 2q */
+		kappa: 23,     /* kappa */
+		bInf:  2100,   /* b_inf */
+		bBits: 12 + 1,
+		bL2:   12872 * 12872, /* b_l2 = square of L2 norm */
+		nz1:   154,           /* nz1 = number of coeffs equal to +/-1 in the private key */
+		nz2:   0,             /* nz2 = number of coeffs equal to +/-2 */
+		sigma: 215,           /* sigma */
+		bigM:  17825,         /* M  (actually p_max. see workings below)  */
+		m:     1.21,          /* m = repetition rate BLISS  strongswan .M = 46539, with alpha = 1.000. BLISS-B .M = 17954, with alpha = 1.610 (we get 17623) */
+		w:     w12289n512,    /* w = powers of omega  (for NTT) */
+		r:     r12289n512,    /* r = powers of omeag/n (for inverse NTT) */
+		ell:   21,            /* ell */
 	},
 
 	/* bliss-b 2 */
 
 	&ParamT{
-		kind:      B2,    /* kind */
-		q:         12289, /* q */
-		qBits:     14,
-		n:         512, /* n */
-		nBits:     9,
-		d:         10,     /* d */
-		modP:      24,     /* mod_p */
-		q2:        24578,  /* 2 * field modulus  */
-		qInv:      349496, /* floor(2^32/q)      */
-		q2Inv:     174748, /* floor(2^32/q2)     */
-		oneQ2:     6145,   /* 1/(q + 2) mod 2q   */
-		kappa:     23,     /* kappa */
-		bInf:      1563,   /* b_inf */
-		bBits:     11 + 1,
-		bL2:       11074 * 11074, /* L2 norm */
-		nz1:       154,           /* nz1 */
-		nz2:       0,             /* nz2 */
-		sigma:     107,           /* sigma */
-		bigM:      17825,         /* M (actually p_max. see workings below) */
-		m:         2.18,          /* m  = repetition rate  alpha = 0.801 */
-		w:         w12289n512,    /* w */
-		r:         r12289n512,    /* r */
-		ell:       19,            /* ell: computed by tools/ell.c */
-		precision: 64,            /* precision */
+		kind:  B2,    /* kind */
+		q:     12289, /* q */
+		qBits: 14,
+		n:     512, /* n */
+		nBits: 9,
+		d:     10,     /* d */
+		modP:  24,     /* mod_p */
+		q2:    24578,  /* 2 * field modulus  */
+		qInv:  349496, /* floor(2^32/q)      */
+		q2Inv: 174748, /* floor(2^32/q2)     */
+		oneQ2: 6145,   /* 1/(q + 2) mod 2q   */
+		kappa: 23,     /* kappa */
+		bInf:  1563,   /* b_inf */
+		bBits: 11 + 1,
+		bL2:   11074 * 11074, /* L2 norm */
+		nz1:   154,           /* nz1 */
+		nz2:   0,             /* nz2 */
+		sigma: 107,           /* sigma */
+		bigM:  17825,         /* M (actually p_max. see workings below) */
+		m:     2.18,          /* m  = repetition rate  alpha = 0.801 */
+		w:     w12289n512,    /* w */
+		r:     r12289n512,    /* r */
+		ell:   19,            /* ell: computed by tools/ell.c */
 	},
 
 	/* bliss-b 3 */
 
 	&ParamT{
-		kind:      B3,    /* kind */
-		q:         12289, /* q */
-		qBits:     14,
-		n:         512, /* n */
-		nBits:     9,
-		d:         9,      /* d */
-		modP:      48,     /* mod_p */
-		q2:        24578,  /* 2 * field modulus  */
-		qInv:      349496, /* floor(2^32/q)      */
-		q2Inv:     174748, /* floor(2^32/q2)     */
-		oneQ2:     6145,   /* 1/(q + 2) mod 2q   */
-		kappa:     30,     /* kappa */
-		bInf:      1760,   /* b_inf */
-		bBits:     11 + 1,
-		bL2:       10206 * 10206, /* L2 norm */
-		nz1:       216,           /* nz1 */
-		nz2:       16,            /* nz2 */
-		sigma:     250,           /* sigma */
-		bigM:      42270,         /* M  (actually p_max. see workings below) */
-		m:         1.40,          /* m  = repetition rate strongswan BLISS .M = 128113,  with alpha = 0.700. BLISS_B .M = 42455, with alpha = 1.216 (we get 42059) */
-		w:         w12289n512,    /* w */
-		r:         r12289n512,    /* r */
-		ell:       21,            /* ell */
-		precision: 64,            /* precision */
+		kind:  B3,    /* kind */
+		q:     12289, /* q */
+		qBits: 14,
+		n:     512, /* n */
+		nBits: 9,
+		d:     9,      /* d */
+		modP:  48,     /* mod_p */
+		q2:    24578,  /* 2 * field modulus  */
+		qInv:  349496, /* floor(2^32/q)      */
+		q2Inv: 174748, /* floor(2^32/q2)     */
+		oneQ2: 6145,   /* 1/(q + 2) mod 2q   */
+		kappa: 30,     /* kappa */
+		bInf:  1760,   /* b_inf */
+		bBits: 11 + 1,
+		bL2:   10206 * 10206, /* L2 norm */
+		nz1:   216,           /* nz1 */
+		nz2:   16,            /* nz2 */
+		sigma: 250,           /* sigma */
+		bigM:  42270,         /* M  (actually p_max. see workings below) */
+		m:     1.40,          /* m  = repetition rate strongswan BLISS .M = 128113,  with alpha = 0.700. BLISS_B .M = 42455, with alpha = 1.216 (we get 42059) */
+		w:     w12289n512,    /* w */
+		r:     r12289n512,    /* r */
+		ell:   21,            /* ell */
 	},
 
 	/* bliss-b 4 */
 
 	&ParamT{
-		kind:      B4,    /* kind */
-		q:         12289, /* q */
-		qBits:     14,
-		n:         512,    /* n */
-		nBits:     9,      /* n */
-		d:         8,      /* d */
-		modP:      96,     /* mod_p */
-		q2:        24578,  /* 2 * field modulus  */
-		qInv:      349496, /* floor(2^32/q)      */
-		q2Inv:     174748, /* floor(2^32/q2)     */
-		oneQ2:     6145,   /* 1/(q + 2) mod 2q   */
-		kappa:     39,     /* kappa */
-		bInf:      1613,   /* b_inf */
-		bBits:     11 + 1,
-		bL2:       9901 * 9901, /* L2 norm */
-		nz1:       231,         /* nz1 */
-		nz2:       31,          /* nz2 */
-		sigma:     271,         /* sigma */
-		bigM:      69576,       /* M (actually p_max. see workings below) */
-		m:         1.61,        /* m  = repetition rate strongswan .M = 244186,  with alpha = 0.550  BLISS-B .M = 70034,  with alpha = 1.027  (we get 69950) */
-		w:         w12289n512,  /* w */
-		r:         r12289n512,  /* r */
-		ell:       22,          /* ell */
-		precision: 64,          /* precision */
+		kind:  B4,    /* kind */
+		q:     12289, /* q */
+		qBits: 14,
+		n:     512,    /* n */
+		nBits: 9,      /* n */
+		d:     8,      /* d */
+		modP:  96,     /* mod_p */
+		q2:    24578,  /* 2 * field modulus  */
+		qInv:  349496, /* floor(2^32/q)      */
+		q2Inv: 174748, /* floor(2^32/q2)     */
+		oneQ2: 6145,   /* 1/(q + 2) mod 2q   */
+		kappa: 39,     /* kappa */
+		bInf:  1613,   /* b_inf */
+		bBits: 11 + 1,
+		bL2:   9901 * 9901, /* L2 norm */
+		nz1:   231,         /* nz1 */
+		nz2:   31,          /* nz2 */
+		sigma: 271,         /* sigma */
+		bigM:  69576,       /* M (actually p_max. see workings below) */
+		m:     1.61,        /* m  = repetition rate strongswan .M = 244186,  with alpha = 0.550  BLISS-B .M = 70034,  with alpha = 1.027  (we get 69950) */
+		w:     w12289n512,  /* w */
+		r:     r12289n512,  /* r */
+		ell:   22,          /* ell */
 	},
 }
 

@@ -295,7 +295,7 @@ var cbliss271_22_128 = []byte{
  * crufty error checking for now
  * panic for parameters we don't support
  */
-func getTable(sigma uint32, ell uint32, precision uint32) []byte {
+func getTable(sigma uint32, ell uint32) []byte {
 	if ell < 19 || ell > 22 {
 		panic("invalid ell")
 	}
@@ -333,7 +333,7 @@ func getTable(sigma uint32, ell uint32, precision uint32) []byte {
 	}
 }
 
-func getKSigma(sigma uint32, precision uint32) uint16 {
+func getKSigma(sigma uint32) uint16 {
 	if precision != 64 && precision != 128 {
 		panic("invalid precision")
 	}
@@ -367,10 +367,7 @@ func getKSigma(sigma uint32, precision uint32) uint16 {
 		panic("invalid precision")
 	}
 }
-func getKSigmaBits(sigma uint32, precision uint32) uint16 {
-	if precision != 64 && precision != 128 {
-		panic("invalid precision")
-	}
+func getKSigmaBits(sigma uint32) uint16 {
 	switch sigma {
 	case 100:
 		if precision == 64 {

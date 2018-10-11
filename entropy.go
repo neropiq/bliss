@@ -25,6 +25,10 @@ package bliss
 
 import (
 	"encoding/binary"
+
+	"golang.org/x/crypto/blake2b"
+
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -46,6 +50,7 @@ type entropyT struct {
 	int16Index uint32
 	int64Index uint32
 	sum512     sum512
+	isTest     bool
 }
 
 /*
@@ -140,15 +145,8 @@ func (entropy *entropyT) randomUint16() uint16 {
  * Random byte
  */
 func (entropy *entropyT) randomUint8() byte {
-	if entropy == nil {
-		panic("entropy must not be nil")
-	}
-
 	if entropy.charIndex >= 64*epoolHashCount {
 		entropy.charPoolRefresh()
-	}
-	if entropy.charIndex >= 64*epoolHashCount {
-		panic("invalid int64 index")
 	}
 	entropy.charIndex++
 	return entropy.charPool[entropy.charIndex-1]
@@ -165,7 +163,7 @@ func (entropy *entropyT) bitPoolRefresh() {
 /*
  * Get a random bit
  */
-func (entropy *entropyT) randomBit() bool {
+func (entropy *entropyT) randomBit() uint32 {
 	if entropy == nil {
 		panic("entropy must not be nil")
 	}
@@ -177,7 +175,7 @@ func (entropy *entropyT) randomBit() bool {
 	entropy.bitPool >>= 1
 	entropy.bitIndex++
 
-	return bit != 0
+	return uint32(bit)
 }
 
 /*
@@ -194,12 +192,22 @@ func (entropy *entropyT) randomBits(n uint32) uint32 {
 	}
 
 	var retval uint32
-	for ; n > 0; n-- {
-		retval <<= 1
-		if entropy.randomBit() {
-			retval |= 1
+
+	//slow, just for compatibility
+	if entropy.isTest {
+		for ; n > 0; n-- {
+			retval <<= 1
+			retval |= entropy.randomBit()
 		}
+		return retval
 	}
+
+	if entropy.bitIndex >= 64-n {
+		entropy.bitPoolRefresh()
+	}
+	retval = uint32(entropy.bitPool & ((1 << n) - 1))
+	entropy.bitPool >>= n
+	entropy.bitIndex += n
 
 	return retval
 }
@@ -208,10 +216,14 @@ func (entropy *entropyT) randomBits(n uint32) uint32 {
  * Initialize: with the given seed
  * - seed must be an array of SHA3_512_DIGEST_LENGTH bytes
  */
-func newEntropy(seed [64]uint8, s sum512) *entropyT {
+func newEntropy(seed [64]uint8, isTest bool) *entropyT {
 	entropy := &entropyT{
 		seed:   seed,
-		sum512: s,
+		isTest: isTest,
+		sum512: blake2b.Sum512,
+	}
+	if isTest {
+		entropy.sum512 = sha3.Sum512
 	}
 	entropy.charPoolRefresh()
 	entropy.int16PoolRefresh()

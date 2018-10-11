@@ -153,10 +153,15 @@ func (r *Reader) Close() error {
 // NewReader returns a new bit Reader that reads bytes from `r`.
 func NewReader(r io.Reader) *Reader {
 	br := new(Reader)
-	if byteReader, ok := r.(io.ByteReader); ok {
-		br.r = byteReader
-	} else {
-		br.r = bufio.NewReader(r)
-	}
+	br.SetReader(r)
 	return br
+}
+
+// SetReader set ior to reader of r.
+func (r *Reader) SetReader(ior io.Reader) {
+	if byteReader, ok := ior.(io.ByteReader); ok {
+		r.r = byteReader
+	} else {
+		r.r = bufio.NewReader(ior)
+	}
 }

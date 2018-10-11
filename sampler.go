@@ -28,13 +28,8 @@ type samplerT struct {
 	c          []byte /* the table we will use for Boolean sampling (from tables.h) */
 	sigma      uint32 /* the standard deviation of the distribution */
 	ell        uint32 /* rows in the table     */
-	precision  uint32 /* precision used in computing the tables */
 	ksigma     uint16 /* k_sigma = ceiling[ sqrt(2*ln 2) * sigma ]  */
 	ksigmaBits uint16 /* number of significant bits in k_sigma */
-}
-
-func (sampler *samplerT) columns() int {
-	return int(sampler.precision) / 8
 }
 
 /*
@@ -42,15 +37,14 @@ func (sampler *samplerT) columns() int {
  * - return true if success/false if error
  * - false means that the parameters sigma/ell/precisions are not supported
  */
-func newSampler(sigma uint32, ell uint32, precision uint32, entropy *entropyT) *samplerT {
+func newSampler(sigma uint32, ell uint32, entropy *entropyT) *samplerT {
 	sampler := &samplerT{
 		entropy:    entropy,
 		sigma:      sigma,
 		ell:        ell,
-		precision:  precision,
-		c:          getTable(sigma, ell, precision),
-		ksigma:     getKSigma(sigma, precision),
-		ksigmaBits: getKSigmaBits(sigma, precision),
+		c:          getTable(sigma, ell),
+		ksigma:     getKSigma(sigma),
+		ksigmaBits: getKSigmaBits(sigma),
 	}
 	return sampler
 }
@@ -65,8 +59,8 @@ func (sampler *samplerT) ber(p []byte) bool {
 		panic("sampler and p must not be nil")
 	}
 
-	for i := 0; i < sampler.columns(); i++ {
-		uc := sampler.entropy.randomUint8()
+	for i := 0; i < columns; i++ {
+		uc := byte(sampler.entropy.randomUint8())
 		if uc < p[i] {
 			return true
 		}
@@ -84,16 +78,21 @@ func (sampler *samplerT) ber(p []byte) bool {
 func (sampler *samplerT) berExp(x uint32) bool {
 	ri := sampler.ell - 1
 	mask := uint32(1) << ri
-	row := int(ri) * sampler.columns()
+	row := int(ri) * columns
 	for mask > 0 {
 		if x&mask != 0 {
-			bit := sampler.ber(sampler.c[row:])
-			if !bit {
-				return false
+			for i := 0; i < columns; i++ {
+				uc := byte(sampler.entropy.randomUint8())
+				if uc < sampler.c[row+i] {
+					break
+				}
+				if uc > sampler.c[row+i] {
+					return false
+				}
 			}
 		}
 		mask >>= 1
-		row -= sampler.columns()
+		row -= columns
 	}
 
 	return true
@@ -115,8 +114,8 @@ func (sampler *samplerT) berCosh(x int32) bool {
 			return true
 		}
 
-		bit = sampler.entropy.randomBit()
-		if !bit {
+		bit1 := sampler.entropy.randomBits(1)
+		if bit1 == 0 {
 			bit2 := sampler.berExp(uint32(x))
 			if !bit2 {
 				return false
@@ -136,7 +135,7 @@ const maxSampleCount = 16
 
 func (sampler *samplerT) posBinary() uint32 {
 restart:
-	if sampler.entropy.randomBit() {
+	if sampler.entropy.randomBits(1) == 1 {
 		return 0
 	}
 
@@ -162,7 +161,7 @@ restart:
 func (sampler *samplerT) gauss() int32 {
 	var valpos int32
 	var x, y uint32
-	var u bool
+	var u uint32
 	for {
 		x = sampler.posBinary()
 		for {
@@ -173,16 +172,16 @@ func (sampler *samplerT) gauss() int32 {
 		}
 
 		e := y * (y + 2*uint32(sampler.ksigma)*x)
-		u = sampler.entropy.randomBit()
+		u = sampler.entropy.randomBits(1)
 		// don't restart if both hold:
 		// 1. (x, y) != (0, 0) or u = 1
 		// 2. sampler_ber_exp(sampler, e) = 1
-		if (x|y != 0 || u) && sampler.berExp(e) {
+		if (x|y != 0 || u == 1) && sampler.berExp(e) {
 			break // lazy sample}
 		}
 	}
 	valpos = int32(uint32(sampler.ksigma)*x + y)
-	if !u {
+	if u == 0 {
 		valpos = -valpos
 	}
 	return valpos

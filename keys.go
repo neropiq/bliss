@@ -27,7 +27,6 @@ import (
 	"encoding/json"
 
 	"github.com/vmihailenco/msgpack"
-	"golang.org/x/crypto/blake2b"
 )
 
 //PrivateKeyT is a bliss-b private key
@@ -80,7 +79,7 @@ func uniformPoly(n int, nz1, nz2 uint32, entropy *entropyT) []int32 {
 
 //NewPrivateKey return a private key for BLISS_B.
 func NewPrivateKey(kind Kind, seed [64]byte) *PrivateKeyT {
-	ent := newEntropy(seed, blake2b.Sum512)
+	ent := newEntropy(seed, false)
 	return newPrivateKey(kind, ent)
 }
 
