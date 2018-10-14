@@ -27,7 +27,7 @@ import (
 	"github.com/AidosKuneen/bliss/bit"
 )
 
-func encodeHuff(kind Kind, in []byte) ([]byte, int, error) {
+func encodeHuff(kind Kind, in []byte) ([]byte, int64, error) {
 	param, err := GetParam(kind)
 	if err != nil {
 		return nil, 0, err
@@ -37,7 +37,7 @@ func encodeHuff(kind Kind, in []byte) ([]byte, int, error) {
 	encp := huffEncs[kind]
 	var buf bytes.Buffer
 	w := bit.NewWriter(&buf)
-	bitlen := 0
+	var bitlen int64
 	for _, inn := range in {
 		z1 := (int(inn) & 0xf0) >> 4
 		z2 := int(inn) & 0x0f
