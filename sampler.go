@@ -49,27 +49,27 @@ func newSampler(sigma uint32, ell uint32, entropy *entropyT) *samplerT {
 	return sampler
 }
 
-/*
- * Sampling Bernoulli_c with c a constant in [0, 1]
- * - p = array of bytes (encoding c in big-endian format)
- * - p must have as many bytes as sampler->columns (= precision/8)
- */
-func (sampler *samplerT) ber(p []byte) bool {
-	if sampler == nil || p == nil {
-		panic("sampler and p must not be nil")
-	}
+// /*
+//  * Sampling Bernoulli_c with c a constant in [0, 1]
+//  * - p = array of bytes (encoding c in big-endian format)
+//  * - p must have as many bytes as sampler->columns (= precision/8)
+//  */
+// func (sampler *samplerT) ber(p []byte) bool {
+// 	if sampler == nil || p == nil {
+// 		panic("sampler and p must not be nil")
+// 	}
 
-	for i := 0; i < columns; i++ {
-		uc := byte(sampler.entropy.randomUint8())
-		if uc < p[i] {
-			return true
-		}
-		if uc > p[i] {
-			return false
-		}
-	}
-	return true // default value
-}
+// 	for i := 0; i < columns; i++ {
+// 		uc := byte(sampler.entropy.randomUint8())
+// 		if uc < p[i] {
+// 			return true
+// 		}
+// 		if uc > p[i] {
+// 			return false
+// 		}
+// 	}
+// 	return true // default value
+// }
 
 /*
  * Sampling Bernoulli_E with E = exp(-x/(2*sigma*sigma)).
@@ -82,7 +82,7 @@ func (sampler *samplerT) berExp(x uint32) bool {
 	for mask > 0 {
 		if x&mask != 0 {
 			for i := 0; i < columns; i++ {
-				uc := byte(sampler.entropy.randomUint8())
+				uc := sampler.entropy.randomUint8()
 				if uc < sampler.c[row+i] {
 					break
 				}
