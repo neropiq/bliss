@@ -32,9 +32,15 @@ import (
 func TestExampleWriter(t *testing.T) {
 	var buf bytes.Buffer
 	bw := NewWriter(&buf)
-	bw.Write(0xff, 4) // Writes        1111
-	bw.Write(0x00, 1) //             0
-	bw.Write(0x13, 5) //       10 011
+	if err := bw.Write(0xff, 4); err != nil { // Writes        1111
+		t.Error(err)
+	}
+	if err := bw.Write(0x00, 1); err != nil { //             0
+		t.Error(err)
+	}
+	if err := bw.Write(0x13, 5); err != nil { //       10 011
+		t.Error(err)
+	}
 	// Close will flush with zero bits, in this case
 	//                  0000 00
 	if err := bw.Close(); err != nil {
@@ -55,13 +61,23 @@ func TestExample(t *testing.T) {
 	var buf bytes.Buffer
 	bw := NewWriter(&buf)
 	for _, r := range message {
-		bw.Write(uint64(r), 1)    // nolint: errcheck
-		bw.Write(uint64(r)>>1, 2) // nolint: errcheck
-		bw.Write(uint64(r)>>3, 3) // nolint: errcheck
-		bw.Write(uint64(r)>>6, 2) // nolint: errcheck
+		if err := bw.Write(uint64(r), 1); err != nil { // nolint: errcheck
+			t.Error(err)
+		}
+		if err := bw.Write(uint64(r)>>1, 2); err != nil { // nolint: errcheck
+			t.Error(err)
+		}
+		if err := bw.Write(uint64(r)>>3, 3); err != nil { // nolint: errcheck
+			t.Error(err)
+		}
+		if err := bw.Write(uint64(r)>>6, 2); err != nil { // nolint: errcheck
+			t.Error(err)
+		}
 	}
 	msg2 := "writebytes"
-	bw.WriteBytes([]byte(msg2))
+	if err := bw.WriteBytes([]byte(msg2)); err != nil {
+		t.Error(err)
+	}
 	if err := bw.Close(); err != nil {
 		log.Fatal(err)
 	}

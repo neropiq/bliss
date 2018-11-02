@@ -2,6 +2,7 @@
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/AidosKuneen/bliss/LICENSE)
 [![GoDoc](https://godoc.org/github.com/AidosKuneen/bliss?status.svg)](https://godoc.org/github.com/AidosKuneen/bliss)
 [![Coverage Status](https://coveralls.io/repos/github/AidosKuneen/bliss/badge.svg?branch=master)](https://coveralls.io/github/AidosKuneen/bliss?branch=master)
+[![GolangCI](https://golangci.com/badges/github.com/AidosKuneen/bliss.svg)](https://golangci.com/r/github.com/AidosKuneen/bliss) 
 
 # bliss 
 
